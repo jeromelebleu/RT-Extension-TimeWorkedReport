@@ -15,23 +15,35 @@
 <& /Elements/Tabs &>
 
 <style>
-    th,td {text-align: left; }
-    .select-user-wrapper,
-    .select-queue-wrapper,
-    .select-queue-wrapper > label {
-        display: inline-block;
-        vertical-align: top;
-        padding-top: 5px;
-    }
+.filters table.full {
+  width: 100%;
+}
+.report-filters-date,
+.report-filters-queue,
+.report-filters-user {
+  float: left;
+  width: 30%;
+  margin-right: 5%;
+}
+.report-filters-user {
+  margin-right: 0;
+}
+td.help {
+  color: #666;
+  font-size: 0.8em;
+  font-style: italic;
+  padding-bottom: 1em;
+}
+td.separator {
+  padding-top: 0.5em;
+  border-bottom: 1px solid #EEE;
+}
 </style>
-<hr>
 
 <%init>
-    
-
     my ( $start_date, $end_date, $effective_end_date, $title );
 
-    $title = loc('Time worked report');
+    $title = loc('Time Worked Report');
 
     $start_date = RT::Date->new( $session{'CurrentUser'} );
     $end_date   = RT::Date->new( $session{'CurrentUser'} );
@@ -53,45 +65,93 @@
     if ($enddate) {
         $end_date->Set( Format => 'unknown', Value => $enddate );
         $enddate = $end_date->AsString( Format => 'ISO', Timezone => 'UTC' );
-        
+
         # Store time in a variable to report back in current users Timezone
         $enddate_localtime = $end_date->AsString( Format => 'ISO', Timezone => 'user' );
     }
 </%init>
 
-<form method="get" action="TimeWorkedReport.html">
-    <br />
+<div class="filters">
+  <form method="get" action="TimeWorkedReport.html">
+    <&|/Widgets/TitleBox, title => loc('Report filters')&>
+    <div class="report-filters-date">
+      <table class="full">
+        <tr>
+          <td class="label"><&|/l&>Start date</&>:</td>
+          <td class="entry">
+            <& /Elements/SelectDate,
+               Name => 'startdate',
+               Default => ($startdate) ? $start_date->AsString(Format => 'ISO', Timezone => 'user') : '',
+            &>
+        </tr>
+        <tr>
+          <td></td>
+          <td class="help">
+            <&|/l&>report will start from midnight on this day unless you indicate otherwise</&>
+          </td>
+        </tr>
 
-    <&|/l&>Start date</&>:
-    <& /Elements/SelectDate, Name => 'startdate', Default => ($startdate) ?  $start_date->AsString(Format => 'ISO', 
-    Timezone => 'user') : ''&>
-    (report will start from midnight on this day unless you indicate otherwise)
-    <br />
-
-    <&|/l&>End date</&>:
-    <& /Elements/SelectDate, Name => 'enddate', Default => ($enddate) ?  $end_date->AsString(Format => 'ISO', 
-    Timezone => 'user') : ''&>
-    (report will -not- be inclusive of this day unless you change the time from midnight)
-    <br />
-
-    <div>
-        <div class="select-queue-wrapper">
-            <label><&|/l&>Queues</&>:</label>
-            <& /Elements/SelectQueue, Multiple => 1, Name => 'queues', Id => 'queues', Default => ($queues||'') &>
-        </div>
-        <div class="select-user-wrapper">
-            <label><&|/l&>User</&>:</label>
-% my $userobject = RT::Queue->new($session{CurrentUser});
-<& /Elements/SelectOwnerDropdown, Name=>'user', Objects => [$userobject], Default => ($user||'') &>
-        </div>
+        <tr>
+          <td class="label"><&|/l&>End date</&>:</td>
+          <td class="entry">
+            <& /Elements/SelectDate,
+               Name => 'enddate',
+               Default => ($enddate) ?  $end_date->AsString(Format => 'ISO', Timezone => 'user') : '',
+            &>
+        </tr>
+        <tr>
+          <td></td>
+          <td class="help">
+            <&|/l&>report will -not- be inclusive of this day unless you change the time from midnight</&>
+          </td>
+        </tr>
+      </table>
     </div>
 
+    <div class="report-filters-queue">
+      <table class="full">
+        <tr>
+          <td class="label"><&|/l&>Queues</&>:</td>
+          <td class="entry">
+            <& /Elements/SelectQueue,
+               Multiple => 1,
+               Name => 'queues',
+               Id => 'queues',
+               Default => ($queues||'')
+            &>
+          </td>
+        </tr>
+      </table>
+    </div>
 
-    <& /Elements/Checkbox, Name => 'byticket', Default => ($byticket) ? 'checked' : ''&>
-    Organize report by ticket instead of by person
-    <& /Elements/Submit&>
-</form>
+    <div class="report-filters-user">
+      <table class="full">
+        <tr>
+          <td class="label"><&|/l&>User</&>:</td>
+          <td class="entry">
+            <& /Elements/SelectOwnerDropdown,
+               Name => 'user',
+               Objects => [RT::Queue->new($session{CurrentUser})],
+               Default => ($user||'')
+            &>
+          </td>
+        </tr>
+        <tr><td class="separator" colspan="2"></td></tr>
+        <tr>
+          <td class="value" colspan="2">
+            <label>
+              <input type="checkbox" class="checkbox" name="byticket" <% $byticket ? 'checked="checked"' : '' %> />
+              <&|/l&>Organize report by ticket instead of by person</&>
+            </label>
+          </td>
+        </tr>
+      </table>
+    </div>
 
+    </&>
+  <& /Elements/Submit, Label => loc("Filter"), id => 'SubmitTicket' &>
+  </form>
+</div>
 
 <%perl>
     use strict;
@@ -249,13 +309,6 @@
     #  superuser+byticket: most worked ticket first, with everyone's contribution ranked by biggest contribution to
     #  smallest
 
-    
-    print "<h2>TIME WORKED REPORT FOR QUEUE(S) " . $queuelist . "</h2>";
-    print "<h3>Date Range: $startdate_localtime TO $enddate_localtime</h3>";
-    if ($byticket) {
-        print "<h3>Organized by Ticket</h3>";
-    }
-    print "<hr>";
 
     # if this person is not a superuser, we should only show them the report for themselves
     # which means we should remove all keys from %stats except their own username
@@ -273,7 +326,7 @@
         foreach my $tid (keys %tstats) {
             if (my @parents = @{$tstats{$tid}{Parents}} ) {
                 foreach my $p_id (@parents) {
-                    next unless $tstats{$p_id}; 
+                    next unless $tstats{$p_id};
                     $tstats{$p_id}{GrandTotal} += $tstats{$tid}{TotalTime};
                 }
             }
@@ -283,7 +336,7 @@
 
 
         # Now emit the report sorted by GrandTotal, TotalTime }
-        for my $tid ( sort {  
+        for my $tid ( sort {
                $tstats{$b}{GrandTotal} <=> $tstats{$a}{GrandTotal}
                                        ||
                 $tstats{$b}{TotalTime} <=> $tstats{$a}{TotalTime}
