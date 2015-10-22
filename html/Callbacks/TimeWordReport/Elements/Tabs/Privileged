@@ -1,11 +1,15 @@
 <%init>
-    my $tools = Menu()->child('tools');
-    $tools->child( 'timeworked' => 
-                    title => 'Time Worked Report',
-                    path => '/Tools/Reports/TimeWorkedReport.html',
-                    description => 'Time Worked Report'
+my $reports;
+my $tools = Menu()->child('tools');
+unless ($reports = $tools->child('reports')) {
+    $reports = $tools->child(
+        'reports',
+        title => loc('Reports'),
     );
+}
+$reports->child(
+    'timeworked',
+    title => loc('Time Worked'),
+    path  => '/Tools/Reports/TimeWorkedReport.html',
+);
 </%init>
-<%args>
-    $Actions => undef
-</%args>
